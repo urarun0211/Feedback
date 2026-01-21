@@ -19,7 +19,7 @@ export default function App() {
   const fetchFeedback = async () => {
     try {
       setLoading(true);
-      const res = await axios.get({API_URL}/feedback);
+      const res = await axios.get(API_URL + "/feedback");
       setData(res.data);
     } catch (err) {
       console.log("Axios error:", err.message);
