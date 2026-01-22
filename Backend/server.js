@@ -7,31 +7,40 @@ const Feedback = require("./models/Feedback");
 
 const app = express();
 
-/* MIDDLEWARE */
+/* =========================
+   MIDDLEWARE
+========================= */
 app.use(
   cors({
-    origin: "*",   // allow all origins (safe for public feedback)
-    methods: ["GET", "POST", "OPTIONS"],
+    origin: "*",
+    methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"],
   })
 );
-app.options("*", cors());
+
 app.use(express.json());
 
-/* MONGODB CONNECT */
+/* =========================
+   MONGODB CONNECTION
+========================= */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.log("❌ MongoDB Error:", err.message));
+  .catch((err) => {
+    console.error("❌ MongoDB Error:", err.message);
+    process.exit(1);
+  });
 
-/* ROOT TEST */
+/* =========================
+   ROUTES
+========================= */
+
+/* ROOT */
 app.get("/", (req, res) => {
-  res.send("Backend kaam kar raha hai ✅");
+  res.status(200).send("Backend kaam kar raha hai ✅");
 });
 
-/* -----------------------------
-   POST: Save feedback/complaint
------------------------------- */
+/* POST feedback */
 app.post("/feedback", async (req, res) => {
   try {
     const { message } = req.body;
@@ -44,17 +53,17 @@ app.post("/feedback", async (req, res) => {
 
     const type =
       lower.includes("problem") ||
-        lower.includes("issue") ||
-        lower.includes("complaint")
+      lower.includes("issue") ||
+      lower.includes("complaint")
         ? "Complaint"
         : "Feedback";
 
-    const entry = new Feedback({
-      message,
+    const feedback = new Feedback({
+      message: message.trim(),
       type,
     });
 
-    await entry.save();
+    await feedback.save();
 
     res.status(201).json({ success: true });
   } catch (err) {
@@ -63,9 +72,7 @@ app.post("/feedback", async (req, res) => {
   }
 });
 
-/* -----------------------------
-   GET: Admin fetch all feedback
------------------------------- */
+/* GET feedback */
 app.get("/feedback", async (req, res) => {
   try {
     const data = await Feedback.find().sort({ time: -1 });
@@ -75,8 +82,10 @@ app.get("/feedback", async (req, res) => {
   }
 });
 
-/* SERVER */
-const PORT = process.env.PORT;
+/* =========================
+   SERVER
+========================= */
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`🚀 Backend running on port ${PORT}`)
 );
