@@ -61,6 +61,16 @@ app.get("/feedback", async (req, res) => {
   }
 });
 
+app.delete("/feedback/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Feedback.findByIdAndDelete(id);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Delete failed" });
+  }
+});
+
 /* ---------------- SERVER ---------------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
