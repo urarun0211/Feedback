@@ -1,3 +1,3 @@
 
-const API_URL ='https://feedbackserver-bcj3.onrender.com'
+const API_URL ='https://feedback-txmi.onrender.com'
 export default API_URL;
