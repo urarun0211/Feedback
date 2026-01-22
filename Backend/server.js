@@ -7,40 +7,24 @@ const Feedback = require("./models/Feedback");
 
 const app = express();
 
-/* =========================
-   MIDDLEWARE
-========================= */
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
-
+/* ---------------- MIDDLEWARE ---------------- */
+app.use(cors()); // ✅ SIMPLE & SAFE
 app.use(express.json());
 
-/* =========================
-   MONGODB CONNECTION
-========================= */
+/* ---------------- MONGODB ---------------- */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => {
-    console.error("❌ MongoDB Error:", err.message);
-    process.exit(1);
-  });
+  .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
-/* =========================
-   ROUTES
-========================= */
+/* ---------------- ROUTES ---------------- */
 
-/* ROOT */
+// Test route
 app.get("/", (req, res) => {
-  res.status(200).send("Backend kaam kar raha hai ✅");
+  res.send("Backend kaam kar raha hai ✅");
 });
 
-/* POST feedback */
+// Save feedback
 app.post("/feedback", async (req, res) => {
   try {
     const { message } = req.body;
@@ -50,7 +34,6 @@ app.post("/feedback", async (req, res) => {
     }
 
     const lower = message.toLowerCase();
-
     const type =
       lower.includes("problem") ||
       lower.includes("issue") ||
@@ -58,12 +41,8 @@ app.post("/feedback", async (req, res) => {
         ? "Complaint"
         : "Feedback";
 
-    const feedback = new Feedback({
-      message: message.trim(),
-      type,
-    });
-
-    await feedback.save();
+    const entry = new Feedback({ message, type });
+    await entry.save();
 
     res.status(201).json({ success: true });
   } catch (err) {
@@ -72,20 +51,18 @@ app.post("/feedback", async (req, res) => {
   }
 });
 
-/* GET feedback */
+// Admin fetch
 app.get("/feedback", async (req, res) => {
   try {
     const data = await Feedback.find().sort({ time: -1 });
     res.json(data);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Fetch failed" });
   }
 });
 
-/* =========================
-   SERVER
-========================= */
+/* ---------------- SERVER ---------------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-  console.log(`🚀 Backend running on port ${PORT}`)
+  console.log(`🚀 Server running on port ${PORT}`)
 );
