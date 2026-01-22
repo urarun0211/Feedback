@@ -8,7 +8,13 @@ const Feedback = require("./models/Feedback");
 const app = express();
 
 /* MIDDLEWARE */
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+); app.options("*", cors());
 app.use(express.json());
 
 /* MONGODB CONNECT */
@@ -37,8 +43,8 @@ app.post("/feedback", async (req, res) => {
 
     const type =
       lower.includes("problem") ||
-      lower.includes("issue") ||
-      lower.includes("complaint")
+        lower.includes("issue") ||
+        lower.includes("complaint")
         ? "Complaint"
         : "Feedback";
 
