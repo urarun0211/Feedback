@@ -8,7 +8,14 @@ const Feedback = require("./models/Feedback");
 const app = express();
 
 /* MIDDLEWARE */
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",   // allow all origins (safe for public feedback)
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+app.options("*", cors());
 app.use(express.json());
 
 /* MONGODB CONNECT */
