@@ -3,14 +3,14 @@
     "name": "Feedback Admin",
     "slug": "frontend",
     "version": "1.0.0",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash.png",
     "cli": {
       "appVersionSource": "remote"
     },
     "android": {
       "package": "com.arun.feedbackadmin",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/splash.png",
         "backgroundColor": "#ffffff"
       }
     },

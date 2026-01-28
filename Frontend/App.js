@@ -14,6 +14,18 @@ import { StatusBar } from "expo-status-bar";
 import axios from "axios";
 import io from "socket.io-client";
 import API_URL from "./config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+
+const CACHE_KEY = "@feedback_data";
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function App() {
   const [data, setData] = useState([]);
@@ -27,12 +39,72 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const toastY = useRef(new Animated.Value(-100)).current;
 
+
+  const loadCachedData = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(CACHE_KEY);
+      if (cachedData !== null) {
+        setData(JSON.parse(cachedData));
+      }
+    } catch (e) {
+      console.log("Error loading cache", e);
+    }
+  };
+  const saveToCache = async (newData) => {
+    try {
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(newData));
+    } catch (e) {
+      console.log("Error saving cache", e);
+    }
+  };
+
+
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then(token => {
+      if (token) {
+        // Is token ko backend par bhejna hai taaki backend ko pata chale kis phone pe notification bhejna hai
+        sendTokenToBackend(token);
+      }
+    });
+  }, []);
+
+  async function registerForPushNotificationsAsync() {
+    let token;
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        alert('Failed to get push token for push notification!');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: "2ee91b4c-ceb8-4a42-a0d4-6060a00d2ef2", // Aapka app.json wala projectId
+      })).data;
+    } else {
+      alert('Must use physical device for Push Notifications');
+    }
+    return token;
+  }
+
+  const sendTokenToBackend = async (token) => {
+    try {
+      await axios.post(`${API_URL}/save-token`, { token });
+      console.log("Token saved to backend");
+    } catch (err) {
+      console.log("Error saving token", err);
+    }
+  };
   /* ---------- SOCKET.IO ---------- */
   useEffect(() => {
     const socket = io(API_URL);
 
     socket.on("connect", () => console.log("✅ Connected to Socket.io"));
-    
+
     socket.on("newFeedback", (newEntry) => {
       showToast(newEntry.message, newEntry.type);
       fetchFeedback(); // Auto-refresh list
@@ -66,6 +138,7 @@ export default function App() {
       setLoading(true);
       const res = await axios.get(API_URL + "/feedback");
       setData(res.data);
+      saveToCache(res.data);
     } catch (err) {
       console.log("Axios error:", err.message);
     } finally {
@@ -74,6 +147,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    loadCachedData();
     fetchFeedback();
   }, []);
 
@@ -91,7 +165,12 @@ export default function App() {
             try {
               await axios.delete(`${API_URL}/feedback/${id}`);
               setModalVisible(false);
-              fetchFeedback();
+
+              // Local state se turant delete karein (UI update ke liye)
+              const updatedData = data.filter(item => item._id !== id);
+              setData(updatedData);
+              saveToCache(updatedData);
+
             } catch (err) {
               Alert.alert("Error", "Delete failed");
             }
