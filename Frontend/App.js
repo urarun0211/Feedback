@@ -83,7 +83,7 @@ export default function App() {
         return;
       }
       token = (await Notifications.getExpoPushTokenAsync({
-        projectId: "6d7eae0f-8f37-4b03-99a8-5966caa853a5",
+        projectId: "2ee91b4c-ceb8-4a42-a0d4-6060a00d2ef2",
       })).data;
     } else {
       alert('Must use physical device for Push Notifications');

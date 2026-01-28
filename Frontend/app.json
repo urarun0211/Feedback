@@ -11,16 +11,16 @@
         "backgroundColor": "#ffffff"
       }
     },
-    "extra": {
-      "eas": {
-        "projectId": "6d7eae0f-8f37-4b03-99a8-5966caa853a5"
-      }
-    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "userInterfaceStyle": "automatic"
+    "userInterfaceStyle": "automatic",
+    "extra": {
+      "eas": {
+        "projectId": "2ee91b4c-ceb8-4a42-a0d4-6060a00d2ef2"
+      }
+    }
   }
 }
