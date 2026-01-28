@@ -4,9 +4,6 @@
     "slug": "frontend",
     "version": "1.0.0",
     "icon": "./assets/splash.png",
-    "cli": {
-      "appVersionSource": "remote"
-    },
     "android": {
       "package": "com.arun.feedbackadmin",
       "adaptiveIcon": {
