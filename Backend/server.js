@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
-const { Expo } = require("expo-server-sdk"); 
+const { Expo } = require("expo-server-sdk");
 require("dotenv").config();
 
 const Feedback = require("./models/Feedback");
@@ -13,11 +13,11 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "DELETE"],
   },
 });
 
-const expo = new Expo(); 
+const expo = new Expo();
 
 /* ---------------- MIDDLEWARE ---------------- */
 app.use(cors());
@@ -29,43 +29,83 @@ mongoose
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
-// Admin Token Schema (Push Notification ke liye)
+/* ---------------- ADMIN TOKEN MODEL ---------------- */
 const tokenSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true },
 });
+
 const AdminToken = mongoose.model("AdminToken", tokenSchema);
 
 /* ---------------- SOCKET.IO ---------------- */
 io.on("connection", (socket) => {
   console.log("📡 Admin connected:", socket.id);
-  socket.on("disconnect", () => console.log("📡 Admin disconnected"));
+  socket.on("disconnect", () =>
+    console.log("📡 Admin disconnected:", socket.id)
+  );
 });
 
-/* ---------------- ROUTES ---------------- */
-
-// Test route
+/* ---------------- TEST ROUTE ---------------- */
 app.get("/", (req, res) => {
   res.send("Backend kaam kar raha hai ✅");
 });
 
-// 1. Admin Token Save Karein (Notification ke liye)
+/* =====================================================
+   🔥 SMART AUTO DETECTION LOGIC (Complaint / Feedback)
+===================================================== */
+function detectType(message) {
+  const lower = message.toLowerCase();
+
+  const complaintKeywords = [
+    "problem", "issue", "complaint", "error", "not working",
+    "bad", "worst", "fail", "slow", "bug", "fix", "help",
+    "poor", "kharab", "dikkat", "kaam nahi", "bekar",
+    "shikayat", "ghatiya", "fraud", "late", "stop"
+  ];
+
+  const positiveKeywords = [
+    "good", "great", "awesome", "nice", "excellent",
+    "fast", "love", "best", "amazing", "perfect",
+    "accha", "badiya", "mast", "shandar", "thank you"
+  ];
+
+  let complaintScore = 0;
+  let positiveScore = 0;
+
+  complaintKeywords.forEach(word => {
+    if (lower.includes(word)) complaintScore++;
+  });
+
+  positiveKeywords.forEach(word => {
+    if (lower.includes(word)) positiveScore++;
+  });
+
+  if (complaintScore > positiveScore) return "Complaint";
+  return "Feedback";
+}
+
+/* ---------------- SAVE ADMIN TOKEN ---------------- */
 app.post("/save-token", async (req, res) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ error: "Token required" });
+
+    if (!token) {
+      return res.status(400).json({ error: "Token required" });
+    }
 
     const exists = await AdminToken.findOne({ token });
+
     if (!exists) {
       await AdminToken.create({ token });
       console.log("🎟️ New Admin Token Saved");
     }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Token save error" });
   }
 });
 
-// 2. Feedback Save & Notify (User isse hit karega)
+/* ---------------- SAVE FEEDBACK ---------------- */
 app.post("/feedback", async (req, res) => {
   try {
     const { message } = req.body;
@@ -74,73 +114,71 @@ app.post("/feedback", async (req, res) => {
       return res.status(400).json({ error: "Message required" });
     }
 
-    const lower = message.toLowerCase();
+    // 🔥 Auto detect type
+    const type = detectType(message);
 
-    // Categorization Logic
-    const complaintKeywords = [
-      "problem", "issue", "complaint", "error", "not working", "bad", "worst", 
-      "fail", "slow", "bug", "fix", "help", "poor", "kharab", "dikkat", 
-      "kaam nahi kar raha", "bekar", "shikayat", "ghatiya", "fraud", "stop"
-    ];
+    const entry = new Feedback({
+      message,
+      type,
+    });
 
-    const isComplaint = complaintKeywords.some((word) => lower.includes(word));
-    const type = isComplaint ? "Complaint" : "Feedback";
-
-    // Save to Database
-    const entry = new Feedback({ message, type });
     await entry.save();
 
-    // Socket Emit (Real-time in App)
+    // Real-time emit
     io.emit("newFeedback", entry);
 
-    // --- PUSH NOTIFICATION LOGIC ---
+    /* -------- PUSH NOTIFICATION -------- */
     const tokens = await AdminToken.find();
     let messages = [];
 
     for (let admin of tokens) {
       if (!Expo.isExpoPushToken(admin.token)) {
-        console.error(`Invalid token: ${admin.token}`);
+        console.error("Invalid token:", admin.token);
         continue;
       }
 
       messages.push({
         to: admin.token,
         sound: "default",
-        title: `Naya ${type} Aaya Hai! 📢`,
+        title: `📢 Naya ${type} Aaya Hai`,
         body: message,
-        data: { feedbackId: entry._id },
+        data: { id: entry._id },
         priority: "high",
       });
     }
 
-    // Expo ko chunks mein messages bhejna (Best Practice)
-    let chunks = expo.chunkPushNotifications(messages);
+    const chunks = expo.chunkPushNotifications(messages);
+
     for (let chunk of chunks) {
       try {
         await expo.sendPushNotificationsAsync(chunk);
       } catch (error) {
-        console.error("Push Notification Error:", error);
+        console.error("Push Error:", error);
       }
     }
 
-    res.status(201).json({ success: true, type });
+    res.status(201).json({
+      success: true,
+      type,
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// 3. Admin Fetch (Sari list lane ke liye)
+/* ---------------- GET ALL FEEDBACK ---------------- */
 app.get("/feedback", async (req, res) => {
   try {
-    const data = await Feedback.find().sort({ time: -1 });
+    const data = await Feedback.find().sort({ createdAt: -1 });
     res.json(data);
   } catch {
     res.status(500).json({ error: "Fetch failed" });
   }
 });
 
-// 4. Delete Feedback
+/* ---------------- DELETE FEEDBACK ---------------- */
 app.delete("/feedback/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -151,8 +189,9 @@ app.delete("/feedback/:id", async (req, res) => {
   }
 });
 
-/* ---------------- SERVER ---------------- */
+/* ---------------- SERVER START ---------------- */
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () =>
   console.log(`🚀 Server running on port ${PORT}`)
 );
