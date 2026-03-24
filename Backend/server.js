@@ -26,7 +26,9 @@ app.use(express.json());
 /* ---------------- MONGODB ---------------- */
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => {}) // Success log removed
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    }) 
   .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
 /* ---------------- ADMIN TOKEN MODEL ---------------- */
