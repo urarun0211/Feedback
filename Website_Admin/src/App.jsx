@@ -25,11 +25,24 @@ const API_URL = "https://feedback-backend-fdux.onrender.com";
 function App() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [filter, setFilter] = useState("All"); // All, Feedback, Complaint
   const [statusFilter, setStatusFilter] = useState("All"); // All, Pending, Closed
   const [search, setSearch] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [view, setView] = useState("Dashboard");
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile && !sidebarOpen && window.innerWidth > 1024) {
+        // Optional: auto open on large screens
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [sidebarOpen]);
 
   // Socket setup
   useEffect(() => {
@@ -106,11 +119,22 @@ function App() {
 
   return (
     <div className="admin-container">
+      {/* MOBILE OVERLAY */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
       <motion.aside 
         initial={false}
-        animate={{ width: sidebarOpen ? 260 : 80 }}
-        className="sidebar"
+        animate={{ 
+          width: isMobile ? 260 : (sidebarOpen ? 260 : 80),
+          x: isMobile ? (sidebarOpen ? 0 : -260) : 0
+        }}
+        className={`sidebar ${sidebarOpen ? "open" : ""}`}
       >
         <div className="logo-section">
           <img src={logo} alt="Sanghi Logo" className="sidebar-logo" />
@@ -118,9 +142,9 @@ function App() {
         </div>
 
         <nav className="nav-list">
-          <NavItem active={view === "Dashboard"} icon={<LayoutDashboard size={20} />} label="Dashboard" open={sidebarOpen} onClick={() => setView("Dashboard")} />
-          <NavItem active={view === "Complaints"} icon={<AlertCircle size={20} />} label="Complaints" open={sidebarOpen} onClick={() => { setView("Complaints"); setFilter("Complaint"); }} />
-          <NavItem active={view === "Feedback"} icon={<MessageSquare size={20} />} label="Feedback" open={sidebarOpen} onClick={() => { setView("Feedback"); setFilter("Feedback"); }} />
+          <NavItem active={view === "Dashboard"} icon={<LayoutDashboard size={20} />} label="Dashboard" open={isMobile || sidebarOpen} onClick={() => { setView("Dashboard"); if(isMobile) setSidebarOpen(false); }} />
+          <NavItem active={view === "Complaints"} icon={<AlertCircle size={20} />} label="Complaints" open={isMobile || sidebarOpen} onClick={() => { setView("Complaints"); setFilter("Complaint"); if(isMobile) setSidebarOpen(false); }} />
+          <NavItem active={view === "Feedback"} icon={<MessageSquare size={20} />} label="Feedback" open={isMobile || sidebarOpen} onClick={() => { setView("Feedback"); setFilter("Feedback"); if(isMobile) setSidebarOpen(false); }} />
         </nav>
 
         <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -131,9 +155,14 @@ function App() {
       {/* MAIN CONTENT */}
       <main className="main-content">
         <header className="top-header">
-          <div className="header-left">
-            <h1 className="page-title">{view}</h1>
-            <p className="page-date">{new Date().toLocaleDateString("en-IN", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <div className="header-left-group">
+            <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
+              <Menu size={24} />
+            </button>
+            <div className="header-left">
+              <h1 className="page-title">{view}</h1>
+              <p className="page-date">{new Date().toLocaleDateString("en-IN", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
           </div>
           
           <div className="header-actions">
