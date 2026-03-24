@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST", "DELETE"],
+    methods: ["GET", "POST", "DELETE", "PATCH"],
   },
 });
 
@@ -26,7 +26,7 @@ app.use(express.json());
 /* ---------------- MONGODB ---------------- */
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+  .then(() => {}) // Success log removed
   .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
 /* ---------------- ADMIN TOKEN MODEL ---------------- */
@@ -38,10 +38,7 @@ const AdminToken = mongoose.model("AdminToken", tokenSchema);
 
 /* ---------------- SOCKET.IO ---------------- */
 io.on("connection", (socket) => {
-  console.log("📡 Admin connected:", socket.id);
-  socket.on("disconnect", () =>
-    console.log("📡 Admin disconnected:", socket.id)
-  );
+  socket.on("disconnect", () => {});
 });
 
 /* ---------------- TEST ROUTE ---------------- */
@@ -96,7 +93,6 @@ app.post("/save-token", async (req, res) => {
 
     if (!exists) {
       await AdminToken.create({ token });
-      console.log("🎟️ New Admin Token Saved");
     }
 
     res.json({ success: true });
@@ -108,14 +104,14 @@ app.post("/save-token", async (req, res) => {
 /* ---------------- SAVE FEEDBACK ---------------- */
 app.post("/feedback", async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, type: manualType } = req.body;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ error: "Message required" });
     }
 
-    // 🔥 Auto detect type
-    const type = detectType(message);
+    // 🔥 Use manual type if provided (from QR/Admin), otherwise auto-detect
+    const type = manualType || detectType(message);
 
     const entry = new Feedback({
       message,
@@ -171,10 +167,37 @@ app.post("/feedback", async (req, res) => {
 /* ---------------- GET ALL FEEDBACK ---------------- */
 app.get("/feedback", async (req, res) => {
   try {
-    const data = await Feedback.find().sort({ createdAt: -1 });
+    const data = await Feedback.find().sort({ time: -1 });
     res.json(data);
   } catch {
     res.status(500).json({ error: "Fetch failed" });
+  }
+});
+
+/* ---------------- UPDATE STATUS (Pending / Closed) ---------------- */
+app.patch("/feedback/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["Pending", "Closed"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const updated = await Feedback.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ error: "Not found" });
+
+    // Real-time update emit
+    io.emit("statusUpdated", updated);
+
+    res.json({ success: true, data: updated });
+  } catch {
+    res.status(500).json({ error: "Status update failed" });
   }
 });
 
@@ -192,6 +215,4 @@ app.delete("/feedback/:id", async (req, res) => {
 /* ---------------- SERVER START ---------------- */
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+server.listen(PORT, () => {});

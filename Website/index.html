@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard – Feedback & Complaints</title>
+    <meta
+      name="description"
+      content="Admin panel to manage customer feedback and complaints. View, filter, and resolve complaints in real-time."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+      /* ─── RESET & BASE ─── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --surface2: #1e2530;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --green: #a855f7; /* Purple Branding */
+        --green-dim: #a855f720;
+        --red: #f85149;
+        --red-dim: #3a1a1a;
+        --orange: #f0883e;
+        --orange-dim: #3a2a10;
+        --blue: #58a6ff;
+        --blue-dim: #1a2840;
+        --radius: 12px;
+        --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      }
+
+      html, body { height: 100%; font-family: "Inter", sans-serif; background: var(--bg); color: var(--text); }
+
+      /* ─── SCROLLBAR ─── */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: var(--bg); }
+      ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+      /* ─── LAYOUT ─── */
+      .layout { display: flex; min-height: 100vh; }
+
+      /* ─── SIDEBAR ─── */
+      .sidebar {
+        width: 240px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 24px 16px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        flex-shrink: 0;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 32px;
+        padding: 0 8px;
+      }
+      .logo-img-sidebar {
+        width: 38px; height: 38px;
+        border-radius: 8px;
+        object-fit: cover;
+      }
+      .logo-text { font-size: 17px; font-weight: 800; color: var(--text); }
+      .logo-sub { font-size: 11px; color: var(--muted); font-weight: 500; }
+
+      .nav-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 0 8px; margin-bottom: 8px; }
+
+      .nav-btn {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        width: 100%;
+        text-align: left;
+        transition: all 0.2s;
+        margin-bottom: 4px;
+        font-family: "Inter", sans-serif;
+      }
+      .nav-btn:hover { background: var(--surface2); color: var(--text); }
+      .nav-btn.active { background: var(--green-dim); color: var(--green); border: 1px solid #a855f730; }
+      .nav-btn .nav-count {
+        margin-left: auto;
+        background: var(--red);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 20px;
+      }
+      .nav-btn .nav-count.green { background: var(--green); }
+
+      .sidebar-footer { margin-top: auto; padding: 12px 8px; }
+      .status-dot { display: inline-block; width: 8px; height: 8px; background: var(--green); border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+
+      /* ─── MAIN ─── */
+      .main { flex: 1; overflow-y: auto; padding: 28px; }
+
+      /* ─── PAGE HEADER ─── */
+      .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+      .page-title { font-size: 26px; font-weight: 800; color: var(--text); }
+      .page-sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+      .refresh-btn {
+        padding: 9px 18px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: "Inter", sans-serif;
+        display: flex; align-items: center; gap: 6px;
+      }
+      .refresh-btn:hover { background: var(--surface); border-color: var(--green); color: var(--green); }
+
+      /* ─── STATS GRID ─── */
+      .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 20px;
+        transition: transform 0.2s;
+      }
+      .stat-card:hover { transform: translateY(-2px); }
+      .stat-icon { font-size: 22px; margin-bottom: 10px; }
+      .stat-num { font-size: 30px; font-weight: 900; }
+      .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 4px; }
+      .stat-card.green { border-left: 3px solid var(--green); }
+      .stat-card.red { border-left: 3px solid var(--red); }
+      .stat-card.orange { border-left: 3px solid var(--orange); }
+      .stat-card.blue { border-left: 3px solid var(--blue); }
+      .stat-card.green .stat-num { color: var(--green); }
+      .stat-card.red .stat-num { color: var(--red); }
+      .stat-card.orange .stat-num { color: var(--orange); }
+      .stat-card.blue .stat-num { color: var(--blue); }
+
+      /* ─── TOOLBAR ─── */
+      .toolbar {
+        display: flex; align-items: center; gap: 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .search-wrap { flex: 1; min-width: 180px; position: relative; }
+      .search-wrap input {
+        width: 100%;
+        padding: 8px 12px 8px 36px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+        font-family: "Inter", sans-serif;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .search-wrap input:focus { border-color: var(--blue); }
+      .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; }
+
+      .filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
+      .filter-chip {
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: "Inter", sans-serif;
+      }
+      .filter-chip:hover { border-color: var(--text); color: var(--text); }
+      .filter-chip.active-type { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+      .filter-chip.active-complaint { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+      .filter-chip.active-pending { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
+      .filter-chip.active-closed { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+
+      /* ─── TABLE ─── */
+      .table-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      table { width: 100%; border-collapse: collapse; }
+      thead { background: var(--surface2); }
+      th {
+        padding: 12px 16px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        border-bottom: 1px solid var(--border);
+      }
+      td {
+        padding: 14px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+      }
+      tr:last-child td { border-bottom: none; }
+      tr { transition: background 0.15s; }
+      tr:hover td { background: var(--surface2); }
+
+      .msg-cell { min-width: 250px; max-width: 400px; }
+      .msg-text { 
+        display: block;
+        color: var(--text); 
+        word-wrap: break-word;
+        word-break: break-all;
+        line-height: 1.4;
+        font-size: 13px;
+      }
+      .msg-text.closed { text-decoration: line-through; color: var(--muted); }
+
+      /* TYPE BADGE */
+      .type-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .type-badge.complaint { background: var(--red-dim); color: var(--red); }
+      .type-badge.feedback { background: var(--green-dim); color: var(--green); }
+
+      /* STATUS BADGE */
+      .status-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        font-family: "Inter", sans-serif;
+        transition: all 0.2s;
+        white-space: nowrap;
+        min-width: 90px;
+        justify-content: center;
+      }
+      .status-badge.pending { background: var(--orange-dim); color: var(--orange); }
+      .status-badge.closed { background: var(--green-dim); color: var(--green); }
+      .status-badge:hover { filter: brightness(1.2); transform: scale(1.05); }
+
+      /* ACTION BUTTONS */
+      .action-wrap { display: flex; gap: 6px; }
+      .icon-btn {
+        width: 30px; height: 30px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        font-size: 14px;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+      }
+      .icon-btn:hover.delete-btn { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+      .icon-btn:hover.view-btn { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+
+      /* ─── EMPTY ─── */
+      .empty-state { text-align: center; padding: 60px 20px; }
+      .empty-icon { font-size: 48px; margin-bottom: 12px; }
+      .empty-title { font-size: 16px; font-weight: 700; color: var(--muted); }
+
+      /* ─── MODAL ─── */
+      .modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.25s;
+      }
+      .modal-overlay.open { opacity: 1; pointer-events: all; }
+      .modal-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px;
+        width: 100%;
+        max-width: 480px;
+        box-shadow: var(--shadow);
+        transform: translateY(20px);
+        transition: transform 0.25s;
+      }
+      .modal-overlay.open .modal-box { transform: translateY(0); }
+
+      .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+      .modal-title { font-size: 20px; font-weight: 800; }
+
+      .modal-close {
+        width: 32px; height: 32px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 16px;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+      }
+      .modal-close:hover { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+
+      .modal-field { margin-bottom: 14px; }
+      .modal-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+      .modal-value { font-size: 14px; color: var(--text); line-height: 1.6; background: var(--surface2); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); }
+
+      .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+      .btn {
+        flex: 1; padding: 11px;
+        border-radius: 9px;
+        border: none;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: "Inter", sans-serif;
+      }
+      .btn-close { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+      .btn-close:hover { border-color: var(--text); }
+      .btn-action-close { background: var(--green); color: #000; }
+      .btn-action-close:hover { filter: brightness(1.1); }
+      .btn-action-pending { background: var(--orange); color: #000; }
+      .btn-action-pending:hover { filter: brightness(1.1); }
+      .btn-delete { background: var(--red); color: #fff; }
+      .btn-delete:hover { filter: brightness(1.1); }
+
+      /* ─── TOAST ─── */
+      .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+      .toast {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: flex; align-items: center; gap: 12px;
+        box-shadow: var(--shadow);
+        min-width: 280px;
+        animation: slideIn 0.3s ease;
+      }
+      .toast-indicator { width: 4px; height: 36px; border-radius: 2px; flex-shrink: 0; }
+      .toast-body { flex: 1; }
+      .toast-title { font-size: 13px; font-weight: 700; color: var(--text); }
+      .toast-msg { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+      .toast.fadeout { animation: fadeOut 0.4s ease forwards; }
+
+      /* ─── REAL-TIME BADGE ─── */
+      .live-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px;
+        background: var(--green-dim);
+        border: 1px solid var(--green);
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--green);
+      }
+
+      /* ─── ANIMATIONS ─── */
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(40px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes fadeOut {
+        to { opacity: 0; transform: translateX(40px); }
+      }
+      @keyframes rowHighlight {
+        0% { background: #3fb95020; }
+        100% { background: transparent; }
+      }
+      .row-new { animation: rowHighlight 2s ease; }
+
+      /* ─── RESPONSIVE ─── */
+      @media (max-width: 900px) {
+        .sidebar { display: none; }
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 600px) {
+        .main { padding: 16px; }
+        .stats-grid { grid-template-columns: 1fr 1fr; }
+        .page-header { flex-direction: column; gap: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="logo">
+          <img src="logo.png" alt="Logo" class="logo-img-sidebar" />
+          <div>
+            <div class="logo-text">SW Admin</div>
+            <div class="logo-sub">Feedback Portal</div>
+          </div>
+        </div>
+
+        <div class="nav-label">Views</div>
+        <button class="nav-btn active" onclick="setView('all')" id="nav-all">
+          <span>📊</span> All Entries
+          <span class="nav-count green" id="count-all">0</span>
+        </button>
+        <button class="nav-btn" onclick="setView('complaint')" id="nav-complaint">
+          <span>🚨</span> Complaints
+          <span class="nav-count" id="count-complaint">0</span>
+        </button>
+        <button class="nav-btn" onclick="setView('pending')" id="nav-pending">
+          <span>⏳</span> Pending
+          <span class="nav-count" id="count-pending">0</span>
+        </button>
+        <button class="nav-btn" onclick="setView('closed')" id="nav-closed">
+          <span>✅</span> Closed
+          <span class="nav-count green" id="count-closed">0</span>
+        </button>
+        <button class="nav-btn" onclick="setView('feedback')" id="nav-feedback">
+          <span>💬</span> Feedback
+          <span class="nav-count green" id="count-feedback">0</span>
+        </button>
+
+        <div class="sidebar-footer">
+          <div style="font-size:12px;color:var(--muted);">
+            <span class="status-dot"></span>
+            <span id="conn-status">Connecting...</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="main">
+        <!-- PAGE HEADER -->
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Admin Dashboard</h1>
+            <p class="page-sub">Manage customer feedback and complaints in real-time</p>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div class="live-badge"><span class="status-dot"></span> Live</div>
+            <button class="refresh-btn" onclick="fetchData()">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats-grid">
+          <div class="stat-card blue">
+            <div class="stat-icon">📊</div>
+            <div class="stat-num" id="s-total">0</div>
+            <div class="stat-label">Total Entries</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon">🚨</div>
+            <div class="stat-num" id="s-complaints">0</div>
+            <div class="stat-label">Complaints</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-num" id="s-pending">0</div>
+            <div class="stat-label">Pending</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-num" id="s-closed">0</div>
+            <div class="stat-label">Closed</div>
+          </div>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div class="toolbar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Search messages..."
+              oninput="renderTable()"
+            />
+          </div>
+          <div class="filter-group" id="type-filter">
+            <button class="filter-chip active-type" data-val="All" onclick="setTypeFilter(this)">All Types</button>
+            <button class="filter-chip" data-val="Complaint" onclick="setTypeFilter(this)">🚨 Complaints</button>
+            <button class="filter-chip" data-val="Feedback" onclick="setTypeFilter(this)">💬 Feedback</button>
+          </div>
+          <div class="filter-group" id="status-filter">
+            <button class="filter-chip active-closed" data-val="All" onclick="setStatusFilter(this)">All Status</button>
+            <button class="filter-chip" data-val="Pending" onclick="setStatusFilter(this)">⏳ Pending</button>
+            <button class="filter-chip" data-val="Closed" onclick="setStatusFilter(this)">✅ Closed</button>
+          </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Message</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Date & Time</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <div class="empty-icon">⏳</div>
+                    <div class="empty-title">Loading data...</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-overlay" id="detail-modal" onclick="closeModal(event)">
+      <div class="modal-box" id="modal-content">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title" id="modal-type-title">Complaint</div>
+            <div id="modal-status-display" style="margin-top:6px;"></div>
+          </div>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+
+        <div class="modal-field">
+          <div class="modal-label">Message</div>
+          <div class="modal-value" id="modal-message">—</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">Type</div>
+          <div class="modal-value" id="modal-type">—</div>
+        </div>
+        <div class="modal-field">
+          <div class="modal-label">Submitted At</div>
+          <div class="modal-value" id="modal-time">—</div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-close" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-action-close" id="modal-action-btn" onclick="modalToggleStatus()">✅ Mark as Closed</button>
+          <button class="btn btn-delete" onclick="modalDelete()">🗑 Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+      // ──────────────────────────────────────────────────────────────
+      // CONFIG — LOCAL TESTING (Change to Render URL only after pushing code)
+      // ──────────────────────────────────────────────────────────────
+      const API_URL = "http://localhost:5000";
+
+      let allData = [];
+      let currentTypeFilter = "All";
+      let currentStatusFilter = "All";
+      let openItem = null;
+      let currentView = "all";
+
+      // ─── SOCKET ───
+      const socket = io(API_URL, { transports: ["websocket", "polling"] });
+
+      socket.on("connect", () => {
+        document.getElementById("conn-status").textContent = "Connected";
+        showToast("Connected", "Real-time updates active 🟢", "green");
+      });
+      socket.on("disconnect", () => {
+        document.getElementById("conn-status").textContent = "Disconnected";
+      });
+      socket.on("newFeedback", (entry) => {
+        allData.unshift(entry);
+        updateStats();
+        renderTable();
+        showToast(
+          `New ${entry.type}! 🔔`,
+          entry.message,
+          entry.type === "Complaint" ? "red" : "green"
+        );
+        setTimeout(() => {
+          const row = document.querySelector(`tr[data-id="${entry._id}"]`);
+          if (row) row.classList.add("row-new");
+        }, 100);
+      });
+      socket.on("statusUpdated", (updated) => {
+        allData = allData.map((i) =>
+          i._id === updated._id ? { ...i, status: updated.status } : i
+        );
+        if (openItem && openItem._id === updated._id) {
+          openItem.status = updated.status;
+          updateModalStatus();
+        }
+        updateStats();
+        renderTable();
+      });
+
+      // ─── FETCH ───
+      async function fetchData() {
+        try {
+          const res = await fetch(`${API_URL}/feedback`);
+          allData = await res.json();
+          updateStats();
+          renderTable();
+          updateNavCounts();
+        } catch (e) {
+          showToast("Error", "Could not connect to backend ❌", "red");
+        }
+      }
+
+      // ─── STATS ───
+      function updateStats() {
+        const total = allData.length;
+        const complaints = allData.filter((i) => i.type === "Complaint").length;
+        const pending = allData.filter((i) => i.status === "Pending").length;
+        const closed = allData.filter((i) => i.status === "Closed").length;
+
+        animateNum("s-total", total);
+        animateNum("s-complaints", complaints);
+        animateNum("s-pending", pending);
+        animateNum("s-closed", closed);
+
+        updateNavCounts();
+      }
+
+      function animateNum(id, target) {
+        const el = document.getElementById(id);
+        const current = parseInt(el.textContent) || 0;
+        if (current === target) return;
+        let start = current;
+        const step = target > current ? 1 : -1;
+        const timer = setInterval(() => {
+          start += step;
+          el.textContent = start;
+          if (start === target) clearInterval(timer);
+        }, 20);
+      }
+
+      function updateNavCounts() {
+        document.getElementById("count-all").textContent = allData.length;
+        document.getElementById("count-complaint").textContent = allData.filter((i) => i.type === "Complaint").length;
+        document.getElementById("count-pending").textContent = allData.filter((i) => i.status === "Pending").length;
+        document.getElementById("count-closed").textContent = allData.filter((i) => i.status === "Closed").length;
+        document.getElementById("count-feedback").textContent = allData.filter((i) => i.type === "Feedback").length;
+      }
+
+      // ─── VIEWS ───
+      function setView(view) {
+        currentView = view;
+        document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+        document.getElementById(`nav-${view}`).classList.add("active");
+
+        if (view === "complaint") { currentTypeFilter = "Complaint"; currentStatusFilter = "All"; }
+        else if (view === "feedback") { currentTypeFilter = "Feedback"; currentStatusFilter = "All"; }
+        else if (view === "pending") { currentTypeFilter = "All"; currentStatusFilter = "Pending"; }
+        else if (view === "closed") { currentTypeFilter = "All"; currentStatusFilter = "Closed"; }
+        else { currentTypeFilter = "All"; currentStatusFilter = "All"; }
+
+        renderTable();
+      }
+
+      // ─── FILTER ───
+      function setTypeFilter(btn) {
+        currentTypeFilter = btn.dataset.val;
+        document.querySelectorAll("#type-filter .filter-chip").forEach((b) => {
+          b.classList.remove("active-type", "active-complaint");
+        });
+        btn.classList.add(currentTypeFilter === "Complaint" ? "active-complaint" : "active-type");
+        renderTable();
+      }
+
+      function setStatusFilter(btn) {
+        currentStatusFilter = btn.dataset.val;
+        document.querySelectorAll("#status-filter .filter-chip").forEach((b) => {
+          b.classList.remove("active-pending", "active-closed");
+        });
+        if (currentStatusFilter === "Pending") btn.classList.add("active-pending");
+        else btn.classList.add("active-closed");
+        renderTable();
+      }
+
+      // ─── RENDER TABLE ───
+      function renderTable() {
+        const search = document.getElementById("search-input").value.toLowerCase();
+        const filtered = allData.filter((item) => {
+          const typeOk = currentTypeFilter === "All" || item.type === currentTypeFilter;
+          const statusOk = currentStatusFilter === "All" || item.status === currentStatusFilter;
+          const searchOk = !search || item.message.toLowerCase().includes(search);
+          return typeOk && statusOk && searchOk;
+        });
+
+        const tbody = document.getElementById("table-body");
+
+        if (filtered.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No results found</div></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = filtered.map((item, idx) => {
+          const isClosed = item.status === "Closed";
+          const isComplaint = item.type === "Complaint";
+          const date = new Date(item.time).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+          return `
+            <tr data-id="${item._id}">
+              <td style="color:var(--muted);font-size:12px;">${idx + 1}</td>
+              <td class="msg-cell">
+                <span class="msg-text ${isClosed ? "closed" : ""}" title="${item.message}">${item.message}</span>
+              </td>
+              <td>
+                <span class="type-badge ${isComplaint ? "complaint" : "feedback"}">
+                  ${isComplaint ? "🚨" : "💬"} ${item.type}
+                </span>
+              </td>
+              <td>
+                <button class="status-badge ${isClosed ? "closed" : "pending"}" onclick="quickToggle('${item._id}', '${item.status}')" title="Click to toggle status">
+                  ${isClosed ? "✅ Closed" : "⏳ Pending"}
+                </button>
+              </td>
+              <td style="color:var(--muted);font-size:12px;">${date}</td>
+              <td>
+                <div class="action-wrap">
+                  <button class="icon-btn view-btn" onclick="openModal('${item._id}')" title="View details">👁</button>
+                  <button class="icon-btn delete-btn" onclick="deleteItem('${item._id}')" title="Delete">🗑</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      // ─── QUICK TOGGLE STATUS ───
+      async function quickToggle(id, currentStatus) {
+        const newStatus = currentStatus === "Closed" ? "Pending" : "Closed";
+        await updateStatus(id, newStatus);
+      }
+
+      async function updateStatus(id, newStatus) {
+        try {
+          const res = await fetch(`${API_URL}/feedback/${id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+          });
+
+          if (res.ok) {
+            // ✅ Local update on success
+            allData = allData.map((i) =>
+              i._id === id ? { ...i, status: newStatus } : i
+            );
+            if (openItem && openItem._id === id) {
+              openItem.status = newStatus;
+              updateModalStatus();
+            }
+            updateStats();
+            renderTable();
+          } else {
+            showToast("Error", "Status update failed", "red");
+          }
+        } catch {
+          showToast("Error", "Status update failed", "red");
+        }
+      }
+
+      // ─── DELETE ───
+      async function deleteItem(id) {
+        if (!confirm("Are you sure you want to delete this entry?")) return;
+        try {
+          await fetch(`${API_URL}/feedback/${id}`, { method: "DELETE" });
+          allData = allData.filter((i) => i._id !== id);
+          if (openItem && openItem._id === id) closeModal();
+          updateStats();
+          renderTable();
+          showToast("Deleted", "Entry removed successfully", "orange");
+        } catch {
+          showToast("Error", "Delete failed", "red");
+        }
+      }
+
+      // ─── MODAL ───
+      function openModal(id) {
+        openItem = allData.find((i) => i._id === id);
+        if (!openItem) return;
+
+        document.getElementById("modal-type-title").textContent = openItem.type;
+        document.getElementById("modal-message").textContent = openItem.message;
+        document.getElementById("modal-type").textContent = openItem.type;
+        document.getElementById("modal-time").textContent = new Date(openItem.time).toLocaleString();
+        updateModalStatus();
+
+        document.getElementById("detail-modal").classList.add("open");
+      }
+
+      function updateModalStatus() {
+        if (!openItem) return;
+        const isClosed = openItem.status === "Closed";
+        document.getElementById("modal-status-display").innerHTML =
+          `<span class="status-badge ${isClosed ? "closed" : "pending"}">${isClosed ? "✅ Closed" : "⏳ Pending"}</span>`;
+        const btn = document.getElementById("modal-action-btn");
+        btn.textContent = isClosed ? "🔄 Mark as Pending" : "✅ Mark as Closed";
+        btn.className = `btn ${isClosed ? "btn-action-pending" : "btn-action-close"}`;
+      }
+
+      async function modalToggleStatus() {
+        if (!openItem) return;
+        const newStatus = openItem.status === "Closed" ? "Pending" : "Closed";
+        await updateStatus(openItem._id, newStatus);
+      }
+
+      async function modalDelete() {
+        if (!openItem) return;
+        await deleteItem(openItem._id);
+      }
+
+      function closeModal(e) {
+        if (e && e.target !== document.getElementById("detail-modal")) return;
+        document.getElementById("detail-modal").classList.remove("open");
+        openItem = null;
+      }
+
+      // ─── TOAST ───
+      function showToast(title, msg, color = "green") {
+        const colors = { green: "var(--green)", red: "var(--red)", orange: "var(--orange)" };
+        const c = document.getElementById("toast-container");
+        const t = document.createElement("div");
+        t.className = "toast";
+        t.innerHTML = `
+          <div class="toast-indicator" style="background:${colors[color]}"></div>
+          <div class="toast-body">
+            <div class="toast-title">${title}</div>
+            <div class="toast-msg">${msg}</div>
+          </div>
+        `;
+        c.appendChild(t);
+        setTimeout(() => {
+          t.classList.add("fadeout");
+          setTimeout(() => t.remove(), 400);
+        }, 3500);
+      }
+
+      // ─── INIT ───
+      fetchData();
+    </script>
+  </body>
+</html>

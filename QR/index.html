@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Apni Baat Bataye</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #f3e5f5, #f8f1ff);
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: #ffffff;
+      padding: 30px 20px;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+
+    .logo-img {
+      width: 80px;
+      height: 80px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #4a148c;
+      font-size: 1.6rem;
+      margin-top: 0;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #555;
+      font-size: 0.95rem;
+      margin-bottom: 15px;
+    }
+
+    /* TYPE SELECTOR */
+    .type-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .type-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1.5px solid #eee;
+      background: #f5f5f5;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .type-btn.active.f-btn { background: #e8f5e9; border-color: #2e7d32; color: #2e7d32; }
+    .type-btn.active.c-btn { background: #ffebee; border-color: #d32f2f; color: #d32f2f; }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 16px;
+      font-size: 1rem;
+      border-radius: 12px;
+      border: 1.5px solid #c8e6c9;
+      resize: none;
+      background: #f9fffb;
+      line-height: 1.5;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #2e7d32;
+      background: #ffffff;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button.action {
+      flex: 1;
+      padding: 14px 12px;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .voice-btn { background: #e8f5e9; color: #1b5e20; border: 1.5px solid #2e7d32; }
+    .submit-btn { background: #2e7d32; color: white; }
+    .submit-btn:disabled { background: #9e9e9e; cursor: not-allowed; }
+
+    .hint { margin-top: 16px; font-size: 0.75rem; color: #777; text-align: center; line-height: 1.4; }
+
+    .message {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 0.9rem;
+      display: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .success { color: #1b5e20; background: #e8f5e9; border: 1px solid #c8e6c9; }
+    .error { color: #c62828; background: #ffebee; border: 1px solid #ffcdd2; }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <img src="logo.png" alt="Logo" class="logo-img" />
+    <h1>Feedback Portal</h1>
+
+    <div class="subtitle" style="color: #6a1b9a; font-weight: 600;">
+      अपनी राय या शिकायत बताएं
+    </div>
+
+    <!-- ADDED TYPE SELECTOR -->
+    <div class="type-selector">
+      <div class="type-btn active f-btn" id="type-f" onclick="setType('Feedback')">💬 Feedback</div>
+      <div class="type-btn c-btn" id="type-c" onclick="setType('Complaint')">🚨 Complaint</div>
+    </div>
+
+    <textarea
+      id="messageInput"
+      placeholder="Type your message here...&#10;अपनी बात यहाँ लिखें..."
+    ></textarea>
+
+    <div class="buttons">
+      <button class="voice-btn action" id="voiceBtn">🎤 Speak / बोलें</button>
+      <button class="submit-btn action" id="submitBtn">Submit / भेजें</button>
+    </div>
+
+    <div class="hint">Your identity is private / आपकी पहचान सुरक्षित है</div>
+    <div class="message success" id="successMsg">Sent Successfully! / बात पहुँच गई है।</div>
+    <div class="message error" id="errorMsg">Try Again / दोबारा कोशिश करें।</div>
+  </div>
+
+  <script>
+    /* 🔗 Update to your local IP or backend URL */
+    const API_URL = "https://feedback-txmi.onrender.com/feedback"; 
+    
+    let selectedType = "Feedback";
+
+    function setType(type) {
+      selectedType = type;
+      document.getElementById("type-f").classList.toggle("active", type === "Feedback");
+      document.getElementById("type-c").classList.toggle("active", type === "Complaint");
+    }
+
+    const textarea = document.getElementById("messageInput");
+    const submitBtn = document.getElementById("submitBtn");
+    const voiceBtn = document.getElementById("voiceBtn");
+
+    /* VOICE TO TEXT */
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = "hi-IN";
+      
+      recognition.onresult = (e) => {
+        textarea.value += (textarea.value.length > 0 ? " " : "") + e.results[0][0].transcript;
+      };
+      voiceBtn.onclick = () => { try { recognition.start(); } catch(e){} };
+    } else { voiceBtn.style.display = "none"; }
+
+    /* SUBMIT */
+    submitBtn.onclick = async () => {
+      const message = textarea.value.trim();
+      if (!message) return alert("Please type something!");
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = "Sending...";
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // ✅ Explicitly send the selected type
+          body: JSON.stringify({ message, type: selectedType }),
+        });
+
+        if (response.ok) {
+          textarea.value = "";
+          document.getElementById("successMsg").style.display = "block";
+          setTimeout(() => document.getElementById("successMsg").style.display = "none", 3000);
+        } else { throw new Error(); }
+      } catch (err) {
+        document.getElementById("errorMsg").style.display = "block";
+        setTimeout(() => document.getElementById("errorMsg").style.display = "none", 3000);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = "Submit / भेजें";
+      }
+    };
+  </script>
+</body>
+</html>
