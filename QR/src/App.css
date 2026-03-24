@@ -104,7 +104,6 @@ body {
 /* TEXTAREA */
 .input-group {
   margin-bottom: 24px;
-  color:red;
 }
 
 .styled-textarea {
@@ -113,7 +112,8 @@ body {
   padding: 18px;
   border-radius: 18px;
   border: 1.5px solid #e2e8f0;
-  background: #fbfdff;
+  background: #ffffff; /* Explicit white background */
+  color: #1e293b; /* Explicit dark text color */
   font-size: 15px;
   font-family: inherit;
   resize: none;
