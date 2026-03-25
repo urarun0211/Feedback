@@ -134,6 +134,7 @@ function App() {
           width: isMobile ? 260 : (sidebarOpen ? 260 : 80),
           x: isMobile ? (sidebarOpen ? 0 : -260) : 0
         }}
+        transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }} // Snappier spring
         className={`sidebar ${sidebarOpen ? "open" : ""}`}
       >
         <div className="logo-section">
@@ -260,7 +261,19 @@ function App() {
 const NavItem = ({ active, icon, label, open, onClick }) => (
   <button className={`nav-item ${active ? "active" : ""}`} onClick={onClick}>
     <div className="nav-icon">{icon}</div>
-    {open && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{label}</motion.span>}
+    <AnimatePresence mode="wait">
+      {open && (
+        <motion.span 
+          initial={{ opacity: 0, x: -10 }} 
+          animate={{ opacity: 1, x: 0 }} 
+          exit={{ opacity: 0, x: -10 }}
+          transition={{ duration: 0.1 }} // Made transition faster
+          className="nav-label-text"
+        >
+          {label}
+        </motion.span>
+      )}
+    </AnimatePresence>
   </button>
 );
 
