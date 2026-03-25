@@ -49,7 +49,11 @@ function App() {
     const socket = io(API_URL);
 
     socket.on("newFeedback", (entry) => {
-      setData((prev) => [entry, ...prev]);
+      setData((prev) => {
+        const exists = prev.some(item => item._id === entry._id);
+        if (exists) return prev;
+        return [entry, ...prev];
+      });
       notify(`New ${entry.type}!`, entry.message);
     });
 
@@ -57,14 +61,14 @@ function App() {
       setData((prev) => prev.map(item => item._id === updated._id ? { ...item, status: updated.status } : item));
     });
 
-    fetchData();
+    fetchData(true); // Initial load shows spinner
 
     return () => socket.disconnect();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const res = await axios.get(`${API_URL}/feedback`);
       // Sort newest first
       const sorted = res.data.sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -72,7 +76,7 @@ function App() {
     } catch (err) {
       console.error("Fetch error", err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
